@@ -10,7 +10,6 @@ const NODE_NAMES = ['GEO_1', 'GS_Frankfurt', 'GS_Hanoi', 'GS_NewYork', 'GS_Singa
 const SEQUENCE_LENGTH = 10;
 const STATUS_COLORS = { normal: '#89CFF0', warning: '#FFD700', anomaly: '#FF6347' };
 
-// --- Dữ liệu ban đầu cho các nút ---
 const initialPositions: Record<string, { x: number, y: number }> = {
     LEO_1: { x: 100, y: 100 }, LEO_2: { x: 300, y: 0 }, LEO_3: { x: 500, y: 100 },
     GEO_1: { x: 300, y: 200 }, GS_Hanoi: { x: 0, y: 400 }, GS_Frankfurt: { x: 200, y: 400 },
@@ -30,58 +29,71 @@ const createNormalSnapshot = () => {
     const edges = [{"source": "LEO_1", "target": "LEO_2", "latency": 5.0, "bandwidth": 0.4}, {"source": "LEO_1", "target": "GS_Hanoi", "latency": 10.0, "bandwidth": 0.6}, {"source": "GS_NewYork", "target": "GEO_1", "latency": 70.0, "bandwidth": 0.3}];
     return { nodes, edges };
 };
-const createAnomalousSnapshot = (targetNode: string) => {
-    const nodes = NODE_NAMES.map(name => (name === targetNode) ? { name, load: 0.95, queue_size: 95 } : { name, load: 0.2, queue_size: 15 });
+
+// Nâng cấp để nhận 'intensity'
+const createAnomalousSnapshot = (targetNode: string, intensity: number) => {
+    const nodes = NODE_NAMES.map(name => {
+      if (name === targetNode) {
+        // Cường độ sẽ điều khiển mức độ bất thường
+        // intensity = 0 -> load = 0.3 (hơi cao hơn bình thường)
+        // intensity = 1 -> load = 0.95 (rất cao)
+        const anomalousLoad = 0.3 + (0.95 - 0.3) * intensity;
+        const anomalousQueue = 20 + (95 - 20) * intensity;
+        return { name, load: anomalousLoad, queue_size: anomalousQueue };
+      }
+      return { name, load: 0.2, queue_size: 15 };
+    });
     const edges = [{"source": "LEO_1", "target": "LEO_2", "latency": 5.0, "bandwidth": 0.4}, {"source": "LEO_1", "target": "GS_Hanoi", "latency": 10.0, "bandwidth": 0.6}, {"source": "GS_NewYork", "target": "GEO_1", "latency": 70.0, "bandwidth": 0.3}];
     return { nodes, edges };
 };
+
 
 // --- Component Chính ---
 function App() {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [systemRisk, setSystemRisk] = useState(0);
     const [anomalyTarget, setAnomalyTarget] = useState<string | null>(null);
+    const [intensity, setIntensity] = useState(1.0); // State mới cho cường độ
     const [apiStatus, setApiStatus] = useState('Idle');
   
     // Hook để gọi API
     useEffect(() => {
       const intervalId = setInterval(() => {
         setApiStatus('Calling API...');
+        // Sử dụng intensity khi tạo snapshot bất thường
         let sequence = anomalyTarget 
-            ? [...Array(5).fill(createNormalSnapshot()), ...Array(5).fill(createAnomalousSnapshot(anomalyTarget))] 
+            ? [...Array(5).fill(createNormalSnapshot()), ...Array(5).fill(createAnomalousSnapshot(anomalyTarget, intensity))] 
             : Array(SEQUENCE_LENGTH).fill(createNormalSnapshot());
         
         fetch('/api/forecast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sequence }) })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+            return res.json();
+        })
         .then(data => { setSystemRisk(data.anomaly_probability); setApiStatus('Success'); })
         .catch(err => { console.error("API call failed:", err); setApiStatus('Failed'); });
       }, 3000);
       return () => clearInterval(intervalId);
-    }, [anomalyTarget]);
+    }, [anomalyTarget, intensity]); // Thêm intensity vào dependency array
 
     // Hook để cập nhật màu sắc
     useEffect(() => {
-        setNodes((nds) =>
-          nds.map((node) => {
+        setNodes((currentNodes) =>
+          currentNodes.map((node) => {
             let color = STATUS_COLORS.normal;
             if (node.id === anomalyTarget && systemRisk > 0.5) {
               color = systemRisk > 0.8 ? STATUS_COLORS.anomaly : STATUS_COLORS.warning;
             }
-
-            // Tạo một object style mới để đảm bảo React phát hiện thay đổi
-            const newStyle = {
-              ...node.style,
-              backgroundColor: color,
-              border: anomalyTarget === node.id ? '3px solid red' : '1px solid black',
-              color: (node.id === anomalyTarget && systemRisk > 0.5) ? 'white' : 'black',
-              fontWeight: (node.id === anomalyTarget && systemRisk > 0.5) ? 'bold' : 'normal',
+            return {
+              ...node,
+              style: {
+                ...node.style,
+                backgroundColor: color,
+                border: anomalyTarget === node.id ? '3px solid red' : '1px solid black',
+                color: (node.id === anomalyTarget && systemRisk > 0.5) ? 'white' : 'black',
+                fontWeight: (node.id === anomalyTarget && systemRisk > 0.5) ? 'bold' : 'normal',
+              },
             };
-            
-            // Chỉ trả về một object node mới nếu style thực sự thay đổi
-            if (JSON.stringify(node.style) !== JSON.stringify(newStyle)) {
-                return { ...node, style: newStyle };
-            }
-            return node;
           })
         );
       }, [systemRisk, anomalyTarget, setNodes]);
@@ -91,19 +103,39 @@ function App() {
         <header className="app-header">
           <h1>GNN Anomaly Forecaster - PoC #2</h1>
           <div className="controls">
-            <span>Inject Anomaly on: </span>
-            <select onChange={(e) => {
-                const newTarget = e.target.value || null;
-                setAnomalyTarget(newTarget);
-                // Reset ngay lập tức để giao diện phản ứng
-                setSystemRisk(0);
-            }} value={anomalyTarget || ''}>
-              <option value="">-- No Anomaly --</option>
-              {NODE_NAMES.map(name => <option key={name} value={name}>{name}</option>)}
-            </select>
-            <span className="status-indicator">
+
+            <div className="control-group">
+              <label htmlFor="anomaly-target">Inject Anomaly on: </label>
+              <select id="anomaly-target" onChange={(e) => {
+                  const newTarget = e.target.value || null;
+                  setAnomalyTarget(newTarget);
+                  setSystemRisk(0);
+              }} value={anomalyTarget || ''}>
+                <option value="">-- No Anomaly --</option>
+                {NODE_NAMES.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
+
+            {/* Thanh trượt cường độ, chỉ hiển thị khi có target được chọn */}
+            {anomalyTarget && (
+              <div className="control-group">
+                <label htmlFor="intensity">Intensity ({intensity.toFixed(2)}): </label>
+                <input 
+                  id="intensity" 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.05" 
+                  value={intensity} 
+                  onChange={(e) => setIntensity(parseFloat(e.target.value))} 
+                />
+              </div>
+            )}
+            
+            <div className="status-indicator">
               API Status: {apiStatus} | System Anomaly Probability: <strong>{systemRisk.toFixed(4)}</strong>
-            </span>
+            </div>
+
           </div>
         </header>
         <main className="app-main">
