@@ -28,9 +28,7 @@ This demo highlights the capability of GNNs to learn and generalize complex netw
 
 A detailed walkthrough of the user interface, the system architecture, and an analysis of the AI model's behavior is available on YouTube.
 
-[![YouTube Demo Video Thumbnail](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUTUBE_VIDEO_ID_HERE)
-
-> **Note:** Please replace `YOUTUBE_VIDEO_ID_HERE` with the actual ID of your YouTube video.
+[![YouTube Demo Video Thumbnail](https://img.youtube.com/vi/Jd-Q25cMeBc/0.jpg)](https://www.youtube.com/watch?v=Jd-Q25cMeBc)
 
 ---
 
