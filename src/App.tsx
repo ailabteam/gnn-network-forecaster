@@ -30,13 +30,9 @@ const createNormalSnapshot = () => {
     return { nodes, edges };
 };
 
-// Nâng cấp để nhận 'intensity'
 const createAnomalousSnapshot = (targetNode: string, intensity: number) => {
     const nodes = NODE_NAMES.map(name => {
       if (name === targetNode) {
-        // Cường độ sẽ điều khiển mức độ bất thường
-        // intensity = 0 -> load = 0.3 (hơi cao hơn bình thường)
-        // intensity = 1 -> load = 0.95 (rất cao)
         const anomalousLoad = 0.3 + (0.95 - 0.3) * intensity;
         const anomalousQueue = 20 + (95 - 20) * intensity;
         return { name, load: anomalousLoad, queue_size: anomalousQueue };
@@ -53,37 +49,65 @@ function App() {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [systemRisk, setSystemRisk] = useState(0);
     const [anomalyTarget, setAnomalyTarget] = useState<string | null>(null);
-    const [intensity, setIntensity] = useState(1.0); // State mới cho cường độ
+    const [intensity, setIntensity] = useState(1.0);
     const [apiStatus, setApiStatus] = useState('Idle');
   
     // Hook để gọi API
     useEffect(() => {
+      console.log(`Effect Triggered: Target='${anomalyTarget}', Intensity=${intensity}`);
+      
       const intervalId = setInterval(() => {
         setApiStatus('Calling API...');
-        // Sử dụng intensity khi tạo snapshot bất thường
-        let sequence = anomalyTarget 
-            ? [...Array(5).fill(createNormalSnapshot()), ...Array(5).fill(createAnomalousSnapshot(anomalyTarget, intensity))] 
-            : Array(SEQUENCE_LENGTH).fill(createNormalSnapshot());
         
+        // Sửa lỗi `Array.fill()` bằng `Array.from()`
+        let sequence;
+        if (anomalyTarget) {
+            console.log(`Generating ANOMALOUS sequence for target '${anomalyTarget}' with intensity ${intensity}`);
+            const normalPart = Array.from({ length: 5 }, createNormalSnapshot);
+            const anomalousPart = Array.from({ length: 5 }, () => createAnomalousSnapshot(anomalyTarget, intensity));
+            sequence = [...normalPart, ...anomalousPart];
+        } else {
+            console.log("Generating NORMAL sequence.");
+            sequence = Array.from({ length: SEQUENCE_LENGTH }, createNormalSnapshot);
+        }
+        
+        // Log dữ liệu sẽ gửi đi để debug
+        console.log("Payload to be sent:", { sequence });
+
         fetch('/api/forecast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sequence }) })
         .then(res => {
-            if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+            if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
             return res.json();
         })
-        .then(data => { setSystemRisk(data.anomaly_probability); setApiStatus('Success'); })
-        .catch(err => { console.error("API call failed:", err); setApiStatus('Failed'); });
+        .then(data => { 
+            console.log("API Response:", data); // Log kết quả trả về
+            setSystemRisk(data.anomaly_probability); 
+            setApiStatus('Success'); 
+        })
+        .catch(err => { 
+            console.error("API call failed:", err); 
+            setApiStatus('Failed'); 
+        });
       }, 3000);
-      return () => clearInterval(intervalId);
-    }, [anomalyTarget, intensity]); // Thêm intensity vào dependency array
+
+      // Dọn dẹp interval khi component unmount hoặc khi dependency thay đổi
+      return () => {
+        console.log("Cleaning up interval.");
+        clearInterval(intervalId);
+      };
+    }, [anomalyTarget, intensity]); // Chỉ chạy lại khi target hoặc intensity thay đổi
 
     // Hook để cập nhật màu sắc
     useEffect(() => {
+        console.log(`Updating colors: Target='${anomalyTarget}', Risk=${systemRisk}`);
         setNodes((currentNodes) =>
           currentNodes.map((node) => {
             let color = STATUS_COLORS.normal;
             if (node.id === anomalyTarget && systemRisk > 0.5) {
               color = systemRisk > 0.8 ? STATUS_COLORS.anomaly : STATUS_COLORS.warning;
             }
+
+            // Tạo object mới để đảm bảo render lại
             return {
               ...node,
               style: {
@@ -103,11 +127,11 @@ function App() {
         <header className="app-header">
           <h1>GNN Anomaly Forecaster - PoC #2</h1>
           <div className="controls">
-
             <div className="control-group">
               <label htmlFor="anomaly-target">Inject Anomaly on: </label>
               <select id="anomaly-target" onChange={(e) => {
                   const newTarget = e.target.value || null;
+                  console.log(`User selected new target: ${newTarget}`);
                   setAnomalyTarget(newTarget);
                   setSystemRisk(0);
               }} value={anomalyTarget || ''}>
@@ -115,27 +139,16 @@ function App() {
                 {NODE_NAMES.map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
-
-            {/* Thanh trượt cường độ, chỉ hiển thị khi có target được chọn */}
             {anomalyTarget && (
               <div className="control-group">
                 <label htmlFor="intensity">Intensity ({intensity.toFixed(2)}): </label>
-                <input 
-                  id="intensity" 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.05" 
-                  value={intensity} 
-                  onChange={(e) => setIntensity(parseFloat(e.target.value))} 
-                />
+                <input id="intensity" type="range" min="0" max="1" step="0.05" value={intensity} 
+                       onChange={(e) => setIntensity(parseFloat(e.target.value))} />
               </div>
             )}
-            
             <div className="status-indicator">
               API Status: {apiStatus} | System Anomaly Probability: <strong>{systemRisk.toFixed(4)}</strong>
             </div>
-
           </div>
         </header>
         <main className="app-main">
