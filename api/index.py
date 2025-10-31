@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import httpx
 import os
 
-# Địa chỉ của server GNN, lắng nghe trên cổng 8889
+# Địa chỉ của server GNN, lắng nghe trên cổng 8888
 COMPUTE_SERVER_URL = os.getenv("COMPUTE_SERVER_URL_GNN", "http://14.232.208.84:8888")
 
 app = FastAPI(title="PoC#2 Vercel Proxy Gateway")
@@ -16,9 +16,6 @@ def get_hello():
 
 @app.post("/api/forecast")
 async def proxy_forecast(request: Request):
-    """
-    Proxy cho endpoint /forecast.
-    """
     try:
         payload = await request.json()
         async with httpx.AsyncClient() as client:
