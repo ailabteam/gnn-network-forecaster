@@ -6,7 +6,7 @@ import httpx
 import os
 
 # Địa chỉ của server GNN, lắng nghe trên cổng 8889
-COMPUTE_SERVER_URL = os.getenv("COMPUTE_SERVER_URL_GNN", "http://14.232.208.84:8889")
+COMPUTE_SERVER_URL = os.getenv("COMPUTE_SERVER_URL_GNN", "http://14.232.208.84:8888")
 
 app = FastAPI(title="PoC#2 Vercel Proxy Gateway")
 
