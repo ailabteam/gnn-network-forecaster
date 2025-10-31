@@ -48,14 +48,14 @@ function App() {
     const [anomalyTarget, setAnomalyTarget] = useState<string | null>(null);
     const [intensity, setIntensity] = useState(1.0);
     const [apiStatus, setApiStatus] = useState('Idle');
-  
+
     useEffect(() => {
       const intervalId = setInterval(() => {
         setApiStatus('Calling API...');
-        let sequence = anomalyTarget 
+        let sequence = anomalyTarget
             ? [...Array(5).fill(normalSnapshotSample), ...Array.from({ length: 5 }, () => createAnomalousSnapshot(anomalyTarget, intensity))]
             : Array(SEQUENCE_LENGTH).fill(normalSnapshotSample);
-        
+
         fetch('/api/forecast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sequence }) })
         .then(res => { if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`); return res.json(); })
         .then(data => { setSystemRisk(data.anomaly_probability); setApiStatus('Success'); })
@@ -75,7 +75,7 @@ function App() {
           })
         );
       }, [systemRisk, anomalyTarget, setNodes]);
-  
+
     return (
       <div className="app-container">
         <header className="app-header">
@@ -96,7 +96,7 @@ function App() {
             {anomalyTarget && (
               <div className="control-group">
                 <label htmlFor="intensity">Intensity ({intensity.toFixed(2)}): </label>
-                <input id="intensity" type="range" min="0" max="1" step="0.05" value={intensity} 
+                <input id="intensity" type="range" min="0" max="1" step="0.05" value={intensity}
                        onChange={(e) => setIntensity(parseFloat(e.target.value))} />
               </div>
             )}
@@ -105,10 +105,32 @@ function App() {
             </div>
           </div>
         </header>
-        <main className="app-main">
-          <NetworkGraph nodes={nodes} onNodesChange={onNodesChange} />
-        </main>
-      </div>
+ <main className="app-main">
+        {/* === THÊM KHỐI CODE NÀY VÀO === */}
+        <div className="side-panel">
+          <div className="explanation-box">
+            <h3>About This PoC</h3>
+            <p>
+              This Proof-of-Concept demonstrates an AI-powered system for **predictive anomaly detection** in a simulated Satellite-Ground Integrated Network (SAGINs).
+            </p>
+            <h4>How it works:</h4>
+            <ol>
+              <li>The frontend simulates network traffic and allows you to "inject" an anomaly (like a sudden traffic surge) on a specific node with varying intensity.</li>
+              <li>A sequence of recent network states is sent to the backend.</li>
+              <li>A pre-trained **Spatio-Temporal Graph Neural Network (ST-GNN)** model running on a GPU server analyzes the data.</li>
+              <li>The model forecasts the probability of a system-wide anomaly, and the interface visualizes the risk by coloring the targeted node.</li>
+            </ol>
+            <p>
+              This showcases the power of GNNs to understand complex, dynamic network relationships and provide early warnings before a failure cascades.
+            </p>
+          </div>
+        </div>
+        {/* === KẾT THÚC KHỐI CODE CẦN THÊM === */}
+
+        <div className="visualizer-panel">
+            <NetworkGraph nodes={nodes} onNodesChange={onNodesChange} />
+        </div>
+      </main>      </div>
     );
 }
 

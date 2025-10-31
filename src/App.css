@@ -294,3 +294,59 @@ body {
   flex-grow: 1;
   position: relative; /* Cần thiết để React Flow hiển thị đúng */
 }
+
+/* ... (CSS cũ giữ nguyên) ... */
+
+/* --- Cập nhật layout cho Main --- */
+.app-main {
+  display: flex; /* Thay đổi thành flex để chia cột */
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden; /* Ngăn cuộn ở cấp độ main */
+}
+
+.side-panel {
+  width: 350px; /* Độ rộng của bảng bên cạnh */
+  padding: 20px;
+  background-color: #ffffff;
+  border-right: 1px solid #ddd;
+  overflow-y: auto; /* Cho phép cuộn nếu nội dung dài */
+  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+}
+
+.visualizer-panel {
+    flex-grow: 1; /* Chiếm hết phần không gian còn lại */
+    position: relative; /* Cần thiết cho React Flow */
+}
+
+
+/* --- Style cho khối giải thích --- */
+.explanation-box {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+.explanation-box h3 {
+    margin-top: 0;
+    color: #0056b3;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+    display: inline-block;
+}
+
+.explanation-box h4 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.explanation-box ol {
+    padding-left: 20px;
+}
+
+.explanation-box li {
+    margin-bottom: 10px;
+}
